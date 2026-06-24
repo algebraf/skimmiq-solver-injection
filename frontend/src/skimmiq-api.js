@@ -44,6 +44,7 @@ function defaultProfileForState(state) {
   const difficulty = String(state?.difficultyId || state?.difficulty || "").toLowerCase();
   if (layout === "E" && difficulty === "classic") return "quality";
   if (layout === "E" && difficulty !== "classic") return "balanced";
+  if (layout === "B" && difficulty === "classic") return "balanced";
   return "fast";
 }
 

@@ -43,9 +43,14 @@ if ($profile === 'auto') {
         $profile = 'quality';
     } elseif ($layout === 'E') {
         $profile = 'balanced';
+    } elseif ($layout === 'B' && $difficulty === 'classic') {
+        $profile = 'balanced';
     } else {
         $profile = 'fast';
     }
+}
+if ($layout === 'B' && $difficulty === 'classic' && $profile === 'fast') {
+    $profile = 'balanced';
 }
 if (!in_array($profile, ['fast', 'balanced', 'quality'], true)) {
     fail_json(400, 'Invalid solver profile.');
