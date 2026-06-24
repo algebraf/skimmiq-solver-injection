@@ -14,6 +14,7 @@ type Key = [u16; 9];
 type PatternKey = [u8; FACE_COUNT * 6];
 
 const DEFAULT_RESCUE_THRESHOLD: usize = 45;
+const SOLVE_STATE_SHORT_EXACT_DEPTH: usize = 4;
 const DEFAULT_RESCUE_TIME_LIMIT_MS: u64 = 10_000;
 const F_RESCUE_LOCAL_WINDOW: usize = 12;
 const F_RESCUE_LOCAL_DEPTH: usize = 7;
@@ -3807,23 +3808,43 @@ fn run_solve_state(args: Vec<String>) -> io::Result<()> {
     let mut solver_args = solve_state_profile_args(&options.profile, options.layout, options.difficulty)?;
     solver_args.extend(options.solver_args);
     let bench_options = parse_bench_options(solver_args)?;
+    let accepted_target = acceptance_target(bench_options.solver.target_mode);
 
     let started = Instant::now();
     let result = if is_target_solved(
         &options.colors,
         &puzzle,
-        acceptance_target(bench_options.solver.target_mode),
+        accepted_target,
     ) {
         SolveResult {
             found: true,
             method: SolveMethod::None,
-            target_used: Some(bench_options.solver.target_mode),
+            target_used: Some(accepted_target),
             operation_profile_used: None,
             reason: "already_solved".to_string(),
             raw_moves: Vec::new(),
             optimized_moves: Vec::new(),
             nodes: 0,
             elapsed_ms: 0,
+            first_table_hit: None,
+        }
+    } else if let Some((raw_moves, nodes, short_elapsed_ms)) = solve_short_exact(
+        &puzzle,
+        &options.colors,
+        accepted_target,
+        SOLVE_STATE_SHORT_EXACT_DEPTH,
+    ) {
+        let optimized_moves = optimize_solution(&puzzle, &options.colors, &raw_moves);
+        SolveResult {
+            found: true,
+            method: SolveMethod::Mitm,
+            target_used: Some(accepted_target),
+            operation_profile_used: Some(OperationProfile::Raw),
+            reason: "found_short_exact".to_string(),
+            raw_moves,
+            optimized_moves,
+            nodes,
+            elapsed_ms: short_elapsed_ms,
             first_table_hit: None,
         }
     } else {
@@ -3866,6 +3887,60 @@ fn run_solve_state(args: Vec<String>) -> io::Result<()> {
     );
 
     Ok(())
+}
+
+fn solve_short_exact(
+    puzzle: &Puzzle,
+    colors: &[Color],
+    target_mode: TargetMode,
+    max_depth: usize,
+) -> Option<(Vec<MoveIndex>, u64, u128)> {
+    let started = Instant::now();
+    let mut nodes = 0u64;
+    let mut seen = HashSet::new();
+    seen.insert(state_key(colors));
+
+    let mut frontier = vec![ExactEntry {
+        colors: colors.to_vec(),
+        path: PathBits::default(),
+        last_move: None,
+    }];
+
+    for _ in 0..max_depth {
+        let mut next = Vec::new();
+        for entry in frontier {
+            for move_index in 0..puzzle.moves.len() {
+                if is_immediate_inverse(puzzle, entry.last_move, move_index) {
+                    continue;
+                }
+
+                let mut next_colors = entry.colors.clone();
+                puzzle.apply_move(&mut next_colors, move_index);
+                nodes += 1;
+
+                let path = entry.path.append(move_index);
+                if is_target_solved(&next_colors, puzzle, target_mode) {
+                    return Some((path.to_vec(), nodes, started.elapsed().as_millis()));
+                }
+
+                let key = state_key(&next_colors);
+                if seen.insert(key) {
+                    next.push(ExactEntry {
+                        colors: next_colors,
+                        path,
+                        last_move: Some(move_index),
+                    });
+                }
+            }
+        }
+
+        frontier = next;
+        if frontier.is_empty() {
+            break;
+        }
+    }
+
+    None
 }
 
 fn parse_solve_state_options(args: Vec<String>) -> io::Result<SolveStateOptions> {
