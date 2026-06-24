@@ -4086,6 +4086,17 @@ fn solve_state_profile_args(
         ]);
     }
 
+    if layout == LayoutId::D && difficulty == Difficulty::Classic {
+        args.extend([
+            "--target",
+            "android",
+            "--table-depth",
+            "4",
+            "--forward-depth",
+            "4",
+        ]);
+    }
+
     Ok(args.into_iter().map(str::to_string).collect())
 }
 
