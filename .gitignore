@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+dist/
+target/
+wasm/**/target/
+npm-debug.log*
+*.log
+*.tmp
+bin/ashtree_native_bench
+frontend/bin/ashtree_native_bench
+frontend/dist/bin/ashtree_native_bench
