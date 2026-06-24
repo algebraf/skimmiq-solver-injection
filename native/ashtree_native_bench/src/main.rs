@@ -4086,7 +4086,18 @@ fn solve_state_profile_args(
         ]);
     }
 
-    if layout == LayoutId::D && difficulty == Difficulty::Classic {
+    if (layout == LayoutId::B || layout == LayoutId::C) && difficulty == Difficulty::Classic {
+        args.extend([
+            "--target",
+            "android-multi",
+            "--table-depth",
+            "5",
+            "--forward-depth",
+            "5",
+        ]);
+    }
+
+    if layout == LayoutId::D {
         args.extend([
             "--target",
             "android",
